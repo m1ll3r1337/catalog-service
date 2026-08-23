@@ -1,3 +1,3 @@
 module github.com/m1ll3r1337/category-service
 
-go 1.25
+go 1.27
