@@ -5,7 +5,6 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
-
 	"github.com/m1ll3r1337/catalog-service/internal/app/config/section"
 )
 
