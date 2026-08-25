@@ -13,5 +13,5 @@ func NewHandler() rhandler.Health {
 }
 
 func (h *handler) LastCheck(w http.ResponseWriter, r *http.Request) {
-	_, _ = w.Write([]byte("OK"))
+	_, _ = w.Write([]byte("ok"))
 }
