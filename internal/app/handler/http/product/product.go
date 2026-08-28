@@ -41,6 +41,7 @@ func (h *handler) Create(w http.ResponseWriter, r *http.Request) {
 	resp := entity.ResponseProductCreate{
 		GUID:         product.GUID,
 		Name:         product.Name,
+		Description:  product.Description,
 		CategoryGUID: product.CategoryGUID,
 		Price:        product.Price,
 		CreatedAt:    product.CreatedAt,
@@ -77,9 +78,11 @@ func (h *handler) Update(w http.ResponseWriter, r *http.Request) {
 	resp := entity.ResponseProductUpdate{
 		GUID:         product.GUID,
 		Name:         &product.Name,
+		Description:  product.Description,
 		CategoryGUID: &product.CategoryGUID,
 		Price:        &product.Price,
 		CreatedAt:    product.CreatedAt,
+		UpdatedAt:    product.UpdatedAt,
 	}
 
 	httph.SendJSON(w, http.StatusOK, resp)
@@ -114,16 +117,19 @@ func (h *handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := make([]entity.ResponseProductUpdate, len(products))
-	for i, product := range products {
-		resp[i] = entity.ResponseProductUpdate{
+	resp := entity.ResponseProductList{
+		Data: make([]entity.ResponseProductListItem, 0, len(products)),
+	}
+	for _, product := range products {
+		resp.Data = append(resp.Data, entity.ResponseProductListItem{
 			GUID:         product.GUID,
-			Name:         &product.Name,
+			Name:         product.Name,
 			Description:  product.Description,
-			Price:        &product.Price,
-			CategoryGUID: &product.CategoryGUID,
+			Price:        product.Price,
+			CategoryGUID: product.CategoryGUID,
 			CreatedAt:    product.CreatedAt,
-		}
+			UpdatedAt:    product.UpdatedAt,
+		})
 	}
 
 	httph.SendJSON(w, http.StatusOK, resp)

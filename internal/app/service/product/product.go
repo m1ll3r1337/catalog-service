@@ -40,6 +40,7 @@ func (s *srv) Create(ctx context.Context, req entity.RequestProductCreate) (enti
 	product := entity.Product{
 		GUID:         uuid.Must(uuid.NewV4()),
 		Name:         req.Name,
+		Description:  req.Description,
 		CategoryGUID: req.CategoryGUID,
 		Price:        req.Price,
 		CreatedAt:    now,
@@ -74,7 +75,19 @@ func (s *srv) Update(ctx context.Context, guid uuid.UUID, req entity.RequestProd
 	product := products[0]
 
 	if req.Name != nil {
+		existing, err := s.repoProduct.List(ctx, req.Name, nil)
+		if err != nil {
+			return entity.Product{}, err
+		}
+		for _, p := range existing {
+			if p.GUID != guid {
+				return entity.Product{}, entity.ErrAlreadyExists
+			}
+		}
 		product.Name = *req.Name
+	}
+	if req.Description != nil {
+		product.Description = req.Description
 	}
 	if req.CategoryGUID != nil {
 		categories, err := s.repoCategory.GetByGUIDs(ctx, []uuid.UUID{*req.CategoryGUID})
