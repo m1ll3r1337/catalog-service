@@ -43,15 +43,25 @@ func (r *repoPg) Delete(ctx context.Context, guid uuid.UUID) error {
 	return rcpostgres.DeleteErr(err)
 }
 
-func (r *repoPg) List(ctx context.Context, name *string, categoryGUID *uuid.UUID) ([]entity.Product, error) {
+func (r *repoPg) List(ctx context.Context, name *string, categoryGUID *uuid.UUID, minPrice, maxPrice *int64) ([]entity.Product, error) {
 	var products []entity.Product
-	q := r.NewSelect().Model(&products)
+
+	query := r.NewSelect().Model(&products)
+
 	if name != nil {
-		q.Where("name = ?", *name)
+		query = query.Where("name = ?", *name)
 	}
 	if categoryGUID != nil {
-		q.Where("category_guid = ?", *categoryGUID)
+		query = query.Where("category_guid = ?", *categoryGUID)
 	}
-	err := q.Scan(ctx)
+	if minPrice != nil {
+		query = query.Where("price >= ?", *minPrice)
+	}
+	if maxPrice != nil {
+		query = query.Where("price <= ?", *maxPrice)
+	}
+
+	err := query.Scan(ctx)
+
 	return products, err
 }
