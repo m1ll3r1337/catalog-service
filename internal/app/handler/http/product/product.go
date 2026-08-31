@@ -1,4 +1,4 @@
-package product
+package hproduct
 
 import (
 	"encoding/json"
