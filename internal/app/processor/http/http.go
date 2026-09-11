@@ -2,12 +2,15 @@ package rprocessor
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/m1ll3r1337/catalog-service/internal/app/config/section"
 	rhandler "github.com/m1ll3r1337/catalog-service/internal/app/handler/http"
+	"github.com/m1ll3r1337/catalog-service/internal/app/util"
+	"github.com/m1ll3r1337/catalog-service/internal/pkg/http/httph"
+	"github.com/m1ll3r1337/catalog-service/internal/pkg/http/mzerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type httpProc struct {
@@ -17,8 +20,14 @@ type httpProc struct {
 
 func NewHTTP(hHealth rhandler.Health, hCategory rhandler.Category, hProduct rhandler.Product, cfg section.ProcessorWebServer) *httpProc {
 	r := mux.NewRouter()
-
 	r.NotFoundHandler = http.HandlerFunc(handlerNotFound)
+
+	r.Use(
+		httph.NewErrorMiddleware(),
+		mzerolog.NewMiddleware(
+			mzerolog.WithSkipper(util.IsFilteredHttpRoute),
+		),
+	)
 
 	vGenericRegHealthCheck(r, hHealth)
 
@@ -46,7 +55,7 @@ func NewHTTP(hHealth rhandler.Health, hCategory rhandler.Category, hProduct rhan
 			return nil
 		}
 
-		log.Printf("Path: %s, Methods: %v", pathTemplate, methods)
+		log.Info().Strs("methods", methods).Str("path", pathTemplate).Msg("Route registered")
 
 		return nil
 	})
@@ -59,6 +68,6 @@ func NewHTTP(hHealth rhandler.Health, hCategory rhandler.Category, hProduct rhan
 }
 
 func (p *httpProc) Serve() error {
-	log.Printf("Starting HTTP server on %s", p.addr)
+	log.Info().Str("addr", p.addr).Msg("Starting HTTP server")
 	return p.server.ListenAndServe()
 }
