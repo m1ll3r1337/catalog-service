@@ -20,34 +20,43 @@ func NewService(repoProduct repository.Product, repoCategory repository.Category
 }
 
 func (s *srv) Create(ctx context.Context, req entity.RequestProductCreate) (entity.Product, error) {
-	existing, err := s.repoProduct.List(ctx, &req.Name, nil, nil, nil)
+	var product entity.Product
+
+	err := s.repoProduct.InsideTx(ctx, func(ctx context.Context) error {
+		existing, err := s.repoProduct.List(ctx, &req.Name, nil, nil, nil)
+		if err != nil {
+			return err
+		}
+		if len(existing) > 0 {
+			return entity.ErrAlreadyExists
+		}
+
+		categories, err := s.repoCategory.GetByGUIDs(ctx, []uuid.UUID{req.CategoryGUID})
+		if err != nil {
+			return err
+		}
+		if len(categories) == 0 {
+			return entity.ErrNotFound
+		}
+
+		now := time.Now()
+		product = entity.Product{
+			GUID:         uuid.Must(uuid.NewV4()),
+			Name:         req.Name,
+			Description:  req.Description,
+			CategoryGUID: req.CategoryGUID,
+			Price:        req.Price,
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+
+		if err := s.repoProduct.Create(ctx, product); err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
-		return entity.Product{}, err
-	}
-	if len(existing) > 0 {
-		return entity.Product{}, entity.ErrAlreadyExists
-	}
-
-	categories, err := s.repoCategory.GetByGUIDs(ctx, []uuid.UUID{req.CategoryGUID})
-	if err != nil {
-		return entity.Product{}, err
-	}
-	if len(categories) == 0 {
-		return entity.Product{}, entity.ErrNotFound
-	}
-
-	now := time.Now()
-	product := entity.Product{
-		GUID:         uuid.Must(uuid.NewV4()),
-		Name:         req.Name,
-		Description:  req.Description,
-		CategoryGUID: req.CategoryGUID,
-		Price:        req.Price,
-		CreatedAt:    now,
-		UpdatedAt:    now,
-	}
-
-	if err := s.repoProduct.Create(ctx, product); err != nil {
 		return entity.Product{}, err
 	}
 
@@ -64,48 +73,57 @@ func (s *srv) GetByGUIDs(ctx context.Context, guids []uuid.UUID) ([]entity.Produ
 }
 
 func (s *srv) Update(ctx context.Context, guid uuid.UUID, req entity.RequestProductUpdate) (entity.Product, error) {
-	products, err := s.repoProduct.GetByGUIDs(ctx, []uuid.UUID{guid})
-	if err != nil {
-		return entity.Product{}, err
-	}
-	if len(products) == 0 {
-		return entity.Product{}, entity.ErrNotFound
-	}
+	var product entity.Product
 
-	product := products[0]
-
-	if req.Name != nil {
-		existing, err := s.repoProduct.List(ctx, req.Name, nil, nil, nil)
+	err := s.repoProduct.InsideTx(ctx, func(ctx context.Context) error {
+		products, err := s.repoProduct.GetByGUIDs(ctx, []uuid.UUID{guid})
 		if err != nil {
-			return entity.Product{}, err
+			return err
 		}
-		for _, p := range existing {
-			if p.GUID != guid {
-				return entity.Product{}, entity.ErrAlreadyExists
+		if len(products) == 0 {
+			return entity.ErrNotFound
+		}
+
+		product = products[0]
+
+		if req.Name != nil {
+			existing, err := s.repoProduct.List(ctx, req.Name, nil, nil, nil)
+			if err != nil {
+				return err
 			}
+			for _, p := range existing {
+				if p.GUID != guid {
+					return entity.ErrAlreadyExists
+				}
+			}
+			product.Name = *req.Name
 		}
-		product.Name = *req.Name
-	}
-	if req.Description != nil {
-		product.Description = req.Description
-	}
-	if req.CategoryGUID != nil {
-		categories, err := s.repoCategory.GetByGUIDs(ctx, []uuid.UUID{*req.CategoryGUID})
-		if err != nil {
-			return entity.Product{}, err
+		if req.Description != nil {
+			product.Description = req.Description
 		}
-		if len(categories) == 0 {
-			return entity.Product{}, entity.ErrNotFound
+		if req.CategoryGUID != nil {
+			categories, err := s.repoCategory.GetByGUIDs(ctx, []uuid.UUID{*req.CategoryGUID})
+			if err != nil {
+				return err
+			}
+			if len(categories) == 0 {
+				return entity.ErrNotFound
+			}
+			product.CategoryGUID = *req.CategoryGUID
 		}
-		product.CategoryGUID = *req.CategoryGUID
-	}
-	if req.Price != nil {
-		product.Price = *req.Price
-	}
+		if req.Price != nil {
+			product.Price = *req.Price
+		}
 
-	product.UpdatedAt = time.Now()
+		product.UpdatedAt = time.Now()
 
-	if err := s.repoProduct.Update(ctx, product); err != nil {
+		if err := s.repoProduct.Update(ctx, product); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
 		return entity.Product{}, err
 	}
 
@@ -113,15 +131,22 @@ func (s *srv) Update(ctx context.Context, guid uuid.UUID, req entity.RequestProd
 }
 
 func (s *srv) Delete(ctx context.Context, guid uuid.UUID) error {
-	products, err := s.repoProduct.GetByGUIDs(ctx, []uuid.UUID{guid})
-	if err != nil {
-		return err
-	}
-	if len(products) == 0 {
-		return entity.ErrNotFound
-	}
+	err := s.repoProduct.InsideTx(ctx, func(ctx context.Context) error {
+		products, err := s.repoProduct.GetByGUIDs(ctx, []uuid.UUID{guid})
+		if err != nil {
+			return err
+		}
+		if len(products) == 0 {
+			return entity.ErrNotFound
+		}
 
-	if err := s.repoProduct.Delete(ctx, guid); err != nil {
+		if err := s.repoProduct.Delete(ctx, guid); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
 		return err
 	}
 
