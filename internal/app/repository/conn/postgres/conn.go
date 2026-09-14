@@ -64,7 +64,7 @@ func NewClient(ctx context.Context, cfg section.RepositoryPostgres) (*Client, er
 	}
 
 	return &Client{
-		_bunDB:   bunDB,
+		_bunDB:   newTxInjector(bunDB),
 		rawBunDB: bunDB,
 		cfg:      cfg,
 	}, nil
@@ -133,4 +133,31 @@ func getLatestVersion(ctx context.Context, m *migrate.Migrator) (int64, error) {
 	}
 
 	return maxVer, nil
+}
+
+func (c *Client) InsideTx(ctx context.Context, fn func(ctx context.Context) error) error {
+	if tx := getTxFromContext(ctx); tx.Tx != nil {
+		return fn(ctx)
+	}
+
+	tx, err := c.rawBunDB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	done := false
+	defer func() {
+		if !done {
+			_ = tx.Rollback()
+		}
+	}()
+
+	txCtx := setTxToContext(ctx, tx)
+	err = fn(txCtx)
+	if err != nil {
+		return err
+	}
+
+	done = true
+	return tx.Commit()
 }
