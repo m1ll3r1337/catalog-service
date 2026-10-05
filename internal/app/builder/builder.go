@@ -10,11 +10,14 @@ import (
 	"syscall"
 
 	"github.com/m1ll3r1337/catalog-service/internal/app/config"
+	ghcatalogv1 "github.com/m1ll3r1337/catalog-service/internal/app/handler/grpc/catalog/v1"
 	rhandler "github.com/m1ll3r1337/catalog-service/internal/app/handler/http"
 	hcategory "github.com/m1ll3r1337/catalog-service/internal/app/handler/http/category"
 	rhealth "github.com/m1ll3r1337/catalog-service/internal/app/handler/http/health"
 	hproduct "github.com/m1ll3r1337/catalog-service/internal/app/handler/http/product"
 	"github.com/m1ll3r1337/catalog-service/internal/app/processor"
+	pgateway "github.com/m1ll3r1337/catalog-service/internal/app/processor/gateway"
+	pgrpc "github.com/m1ll3r1337/catalog-service/internal/app/processor/grpc"
 	rprocessor "github.com/m1ll3r1337/catalog-service/internal/app/processor/http"
 	pprocessor "github.com/m1ll3r1337/catalog-service/internal/app/processor/other"
 	"github.com/m1ll3r1337/catalog-service/internal/app/repository"
@@ -24,6 +27,7 @@ import (
 	"github.com/m1ll3r1337/catalog-service/internal/app/service"
 	scategory "github.com/m1ll3r1337/catalog-service/internal/app/service/category"
 	sproduct "github.com/m1ll3r1337/catalog-service/internal/app/service/product"
+	catalogv1 "github.com/m1ll3r1337/catalog-service/internal/pkg/grpc/gen/catalog/v1"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 )
@@ -45,9 +49,10 @@ type Builder struct {
 	categoryService service.Category
 	productService  service.Product
 
-	healthHandler   rhandler.Health
-	categoryHandler rhandler.Category
-	productHandler  rhandler.Product
+	healthHandler    rhandler.Health
+	categoryHandler  rhandler.Category
+	productHandler   rhandler.Product
+	catalogV1Handler catalogv1.CatalogServiceServer
 
 	processors []processor.Processor
 }
@@ -179,6 +184,13 @@ func (b *Builder) BuildHandlerHttpProduct() {
 	}, b.productService)
 }
 
+func (b *Builder) BuildHandlerGrpcCatalogV1() {
+	b.exec(func(b *Builder) {
+		h := ghcatalogv1.NewHandler(b.productService)
+		b.catalogV1Handler = h
+	}, b.productService)
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ///// PROCESSORS ///////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -193,6 +205,27 @@ func (b *Builder) BuildProcHttp() {
 		)
 		b.processors = append(b.processors, pr)
 	}, b.healthHandler)
+}
+
+func (b *Builder) BuildProcGrpc() {
+	b.exec(func(b *Builder) {
+		p := pgrpc.NewGRPC(
+			b.catalogV1Handler,
+			b.cfg.Processor.Grpc,
+		)
+		b.processors = append(b.processors, p)
+	}, b.catalogV1Handler)
+}
+
+func (b *Builder) BuildProcGateway() {
+	b.exec(func(b *Builder) {
+		p := pgateway.NewGateway(
+			b.cfg.Processor.Gateway,
+			b.cfg.Processor.Grpc,
+		)
+
+		b.processors = append(b.processors, p)
+	})
 }
 
 ////////////////////////////////////////////////////////////////////////////////
