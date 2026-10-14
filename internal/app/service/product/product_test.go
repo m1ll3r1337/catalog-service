@@ -29,6 +29,7 @@ func (s *createProductSuite) SetupTest() {
 	s.srv = &srv{
 		repoProduct:  s.productRepo,
 		repoCategory: s.categoryRepo,
+		metrics:      noopProductMetrics{},
 	}
 }
 

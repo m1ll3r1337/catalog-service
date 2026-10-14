@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/m1ll3r1337/catalog-service/internal/app/entity"
+	"github.com/m1ll3r1337/catalog-service/internal/app/monitor"
 	"github.com/m1ll3r1337/catalog-service/internal/app/repository"
 	"github.com/m1ll3r1337/catalog-service/internal/app/service"
 )
@@ -13,13 +14,16 @@ import (
 type srv struct {
 	repoProduct  repository.Product
 	repoCategory repository.Category
+	metrics      monitor.ProductMetrics
 }
 
-func NewService(repoProduct repository.Product, repoCategory repository.Category) service.Product {
-	return &srv{repoProduct: repoProduct, repoCategory: repoCategory}
+func NewService(repoProduct repository.Product, repoCategory repository.Category, metrics monitor.ProductMetrics) service.Product {
+	return &srv{repoProduct: repoProduct, repoCategory: repoCategory, metrics: metrics}
 }
 
 func (s *srv) Create(ctx context.Context, req entity.RequestProductCreate) (entity.Product, error) {
+	createMetric := s.metrics.Create()
+
 	var product entity.Product
 
 	err := s.repoProduct.InsideTx(ctx, func(ctx context.Context) error {
@@ -57,9 +61,11 @@ func (s *srv) Create(ctx context.Context, req entity.RequestProductCreate) (enti
 		return nil
 	})
 	if err != nil {
+		createMetric.Failed(err)
 		return entity.Product{}, err
 	}
 
+	createMetric.Success(product.Price)
 	return product, nil
 }
 
@@ -156,3 +162,12 @@ func (s *srv) Delete(ctx context.Context, guid uuid.UUID) error {
 func (s *srv) List(ctx context.Context, req entity.RequestProductList) ([]entity.Product, error) {
 	return s.repoProduct.List(ctx, nil, req.CategoryGUID, req.MinPrice, req.MaxPrice)
 }
+
+type (
+	noopProductMetrics      struct{}
+	noopProductCreateMetric struct{}
+)
+
+func (noopProductMetrics) Create() monitor.ProductCreateMetric { return noopProductCreateMetric{} }
+func (noopProductCreateMetric) Success(int64)                  {}
+func (noopProductCreateMetric) Failed(error)                   {}
