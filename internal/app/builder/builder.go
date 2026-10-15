@@ -15,6 +15,7 @@ import (
 	hcategory "github.com/m1ll3r1337/catalog-service/internal/app/handler/http/category"
 	rhealth "github.com/m1ll3r1337/catalog-service/internal/app/handler/http/health"
 	hproduct "github.com/m1ll3r1337/catalog-service/internal/app/handler/http/product"
+	mmetric "github.com/m1ll3r1337/catalog-service/internal/app/monitor/metric"
 	"github.com/m1ll3r1337/catalog-service/internal/app/processor"
 	pgateway "github.com/m1ll3r1337/catalog-service/internal/app/processor/gateway"
 	pgrpc "github.com/m1ll3r1337/catalog-service/internal/app/processor/grpc"
@@ -28,6 +29,7 @@ import (
 	scategory "github.com/m1ll3r1337/catalog-service/internal/app/service/category"
 	sproduct "github.com/m1ll3r1337/catalog-service/internal/app/service/product"
 	catalogv1 "github.com/m1ll3r1337/catalog-service/internal/pkg/grpc/gen/catalog/v1"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 )
@@ -161,7 +163,12 @@ func (b *Builder) BuildServiceCategory() {
 
 func (b *Builder) BuildServiceProduct() {
 	b.exec(func(b *Builder) {
-		s := sproduct.NewService(b.productRepo, b.categoryRepo)
+		productMetrics, err := mmetric.NewPrometheusProduct(prometheus.DefaultRegisterer)
+		if err != nil {
+			b.err = fmt.Errorf("init product metrics: %w", err)
+			return
+		}
+		s := sproduct.NewService(b.productRepo, b.categoryRepo, productMetrics)
 		b.productService = s
 	}, b.productRepo, b.categoryRepo)
 }
