@@ -23,9 +23,11 @@ type httpProc struct {
 	addr   string
 }
 
-func NewHTTP(hHealth rhandler.Health, hCategory rhandler.Category, hProduct rhandler.Product, cfg section.ProcessorWebServer) processor.Processor {
+func NewHTTP(hHealth rhandler.Health, hCategory rhandler.Category, hProduct rhandler.Product, middlewares []httph.Middleware, cfg section.ProcessorWebServer) processor.Processor {
 	r := mux.NewRouter()
 	r.NotFoundHandler = http.HandlerFunc(handlerNotFound)
+
+	r.Use(middlewaresToGorilla(middlewares)...)
 
 	r.Use(
 		httph.NewErrorMiddleware(),
