@@ -37,6 +37,7 @@ func NewHTTP(hHealth rhandler.Health, hCategory rhandler.Category, hProduct rhan
 	)
 
 	vGenericRegHealthCheck(r, hHealth)
+	vGenericRegPprof(r)
 
 	rV1 := r.PathPrefix("/v1").Subrouter()
 
